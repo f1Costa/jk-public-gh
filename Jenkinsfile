@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "webapp:${BUILD_NUMBER}"
+        CONTAINER_NAME = "webapp_ctr"
+    }
+
     stages {
         stage('Cloning Git Repository') {
             steps {
@@ -10,18 +15,25 @@ pipeline {
         
         stage('Build Image') {
             steps {
-              sh 'docker build -t webapp:${BUILD_NUMBER} .'
+                script {
+                    def buildStatus = sh(script: 'docker build -t ${IMAGE_NAME} .', returnStatus: true)
+                    if (buildStatus != 0) {
+                        error("Docker build failed.")
+                    }
+                }
             }
         }
        
-      stage('Deploying Application') {
+        stage('Deploying Application') {
             steps {
-              sh '''
-              docker stop webapp_ctr || true
-              docker rm webapp_ctr || true
-              docker run --rm -d -p 3000:3000 --name webapp_ctr webapp:${BUILD_NUMBER}
-            '''
+                script {
+                    sh '''
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                    docker run -d -p 3000:3000 --name ${CONTAINER_NAME} ${IMAGE_NAME}
+                    '''
+                }
             }
-       }
+        }
     }
 }
